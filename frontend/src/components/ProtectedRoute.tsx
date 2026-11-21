@@ -1,9 +1,9 @@
 import { Navigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
+import { getToken } from '../auth/token'
 
-// Only lets logged-in users see the page, others go to /login
 export default function ProtectedRoute({ children }: { children: ReactNode }) {
-  const token = localStorage.getItem('token')
+  const token = getToken()
 
   if (!token) {
     return <Navigate to="/login" replace />
