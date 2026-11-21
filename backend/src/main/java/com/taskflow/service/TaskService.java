@@ -5,11 +5,18 @@ import com.taskflow.dto.TaskResponse;
 import com.taskflow.dto.UpdateTaskRequest;
 import com.taskflow.model.Project;
 import com.taskflow.model.Task;
+import com.taskflow.model.TaskPriority;
 import com.taskflow.model.TaskStatus;
 import com.taskflow.model.User;
 import com.taskflow.repository.ProjectRepository;
 import com.taskflow.repository.TaskRepository;
+import com.taskflow.repository.TaskSpecification;
 import com.taskflow.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -20,15 +27,39 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
+    private final TaskSortStrategy taskSortStrategy;
 
     public TaskService(
             TaskRepository taskRepository,
             ProjectRepository projectRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            TaskSortStrategy taskSortStrategy
     ) {
         this.taskRepository = taskRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
+        this.taskSortStrategy = taskSortStrategy;
+    }
+
+    public Page<TaskResponse> getProjectTasks(
+            Long projectId,
+            TaskStatus status,
+            TaskPriority priority,
+            String search,
+            String sortBy,
+            String direction,
+            int page,
+            int size,
+            Long userId
+    ) {
+        projectRepository.findByIdAndOwnerId(projectId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("Project not found or unauthorized"));
+
+        Sort sort = taskSortStrategy.createSort(sortBy, direction);
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        Specification<Task> spec = TaskSpecification.filter(projectId, status, priority, search);
+        return taskRepository.findAll(spec, pageable).map(this::toResponse);
     }
 
     public TaskResponse createTask(Long projectId, CreateTaskRequest request, Long userId) {
