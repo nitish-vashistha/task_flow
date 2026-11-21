@@ -1,5 +1,3 @@
-// Shapes of the data coming from the backend
-
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE'
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH'
 
@@ -18,4 +16,14 @@ export interface Task {
   priority: TaskPriority
   dueDate: string | null
   assigneeId: number | null
+  assigneeName?: string | null
+  projectId?: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface AppUser {
+  id: number
+  name: string
+  email: string
 }
