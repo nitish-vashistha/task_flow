@@ -21,8 +21,27 @@ export default function TaskCard({
 
   const priorityClass = `priority-${task.priority.toLowerCase()}`
 
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    e.dataTransfer.setData('application/taskflow-id', String(task.id))
+    e.dataTransfer.setData('application/taskflow-status', task.status)
+    e.dataTransfer.effectAllowed = 'move'
+    // Add a slight delay so the browser captures the element before we style it
+    requestAnimationFrame(() => {
+      ;(e.target as HTMLDivElement).classList.add('task-card-dragging')
+    })
+  }
+
+  const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    ;(e.target as HTMLDivElement).classList.remove('task-card-dragging')
+  }
+
   return (
-    <div className={`task-card ${isOverdue ? 'task-card-overdue' : ''}`}>
+    <div
+      className={`task-card ${isOverdue ? 'task-card-overdue' : ''}`}
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
       <div className="task-card-header">
         <span className={`badge ${priorityClass}`}>{task.priority}</span>
         <button

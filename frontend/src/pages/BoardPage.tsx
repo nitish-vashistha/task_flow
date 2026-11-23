@@ -16,6 +16,12 @@ import Modal from '../components/Modal'
 import Button from '../components/Button'
 import TaskCard from '../components/TaskCard'
 
+const COLUMNS: { key: TaskStatus; label: string; emptyText: string }[] = [
+  { key: 'TODO', label: 'To Do', emptyText: 'No tasks in To Do' },
+  { key: 'IN_PROGRESS', label: 'In Progress', emptyText: 'No tasks in progress' },
+  { key: 'DONE', label: 'Done', emptyText: 'No completed tasks' },
+]
+
 export default function BoardPage() {
   const { id } = useParams<{ id: string }>()
   const projectId = Number(id)
@@ -36,6 +42,9 @@ export default function BoardPage() {
   const [dueDate, setDueDate] = useState('')
   const [assigneeId, setAssigneeId] = useState<string>('')
   const [formError, setFormError] = useState('')
+
+  // Drag-and-drop state
+  const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null)
 
   // Queries
   const {
@@ -172,9 +181,35 @@ export default function BoardPage() {
     }
   }
 
-  const todoTasks = tasks.filter((t) => t.status === 'TODO')
-  const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS')
-  const doneTasks = tasks.filter((t) => t.status === 'DONE')
+  // Drag-and-drop handlers
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, columnStatus: TaskStatus) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (dragOverColumn !== columnStatus) {
+      setDragOverColumn(columnStatus)
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    // Only clear if we're leaving the column itself, not entering a child
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverColumn(null)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetStatus: TaskStatus) => {
+    e.preventDefault()
+    setDragOverColumn(null)
+
+    const taskId = Number(e.dataTransfer.getData('application/taskflow-id'))
+    const sourceStatus = e.dataTransfer.getData('application/taskflow-status') as TaskStatus
+
+    if (!taskId || sourceStatus === targetStatus) return
+
+    statusMutation.mutate({ taskId, status: targetStatus })
+  }
+
+  const tasksByStatus = (s: TaskStatus) => tasks.filter((t) => t.status === s)
 
   return (
     <div>
@@ -258,80 +293,41 @@ export default function BoardPage() {
 
         {/* Kanban Board Columns */}
         <div className="kanban-board">
-          {/* Column: To Do */}
-          <div className="kanban-column">
-            <div className="column-header">
-              <h3>To Do</h3>
-              <span className="column-count">{todoTasks.length}</span>
-            </div>
-            <div className="column-cards">
-              {todoTasks.length === 0 ? (
-                <div className="column-empty">No tasks in To Do</div>
-              ) : (
-                todoTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onEdit={openEditModal}
-                    onDelete={(taskId) => deleteMutation.mutate(taskId)}
-                    onStatusChange={(taskId, newStatus) =>
-                      statusMutation.mutate({ taskId, status: newStatus })
-                    }
-                  />
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Column: In Progress */}
-          <div className="kanban-column">
-            <div className="column-header">
-              <h3>In Progress</h3>
-              <span className="column-count">{inProgressTasks.length}</span>
-            </div>
-            <div className="column-cards">
-              {inProgressTasks.length === 0 ? (
-                <div className="column-empty">No tasks in progress</div>
-              ) : (
-                inProgressTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onEdit={openEditModal}
-                    onDelete={(taskId) => deleteMutation.mutate(taskId)}
-                    onStatusChange={(taskId, newStatus) =>
-                      statusMutation.mutate({ taskId, status: newStatus })
-                    }
-                  />
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Column: Done */}
-          <div className="kanban-column">
-            <div className="column-header">
-              <h3>Done</h3>
-              <span className="column-count">{doneTasks.length}</span>
-            </div>
-            <div className="column-cards">
-              {doneTasks.length === 0 ? (
-                <div className="column-empty">No completed tasks</div>
-              ) : (
-                doneTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onEdit={openEditModal}
-                    onDelete={(taskId) => deleteMutation.mutate(taskId)}
-                    onStatusChange={(taskId, newStatus) =>
-                      statusMutation.mutate({ taskId, status: newStatus })
-                    }
-                  />
-                ))
-              )}
-            </div>
-          </div>
+          {COLUMNS.map((col) => {
+            const colTasks = tasksByStatus(col.key)
+            const isOver = dragOverColumn === col.key
+            return (
+              <div
+                key={col.key}
+                className={`kanban-column ${isOver ? 'kanban-column-drag-over' : ''}`}
+                onDragOver={(e) => handleDragOver(e, col.key)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, col.key)}
+              >
+                <div className="column-header">
+                  <h3>{col.label}</h3>
+                  <span className="column-count">{colTasks.length}</span>
+                </div>
+                <div className="column-cards">
+                  {colTasks.length === 0 ? (
+                    <div className="column-empty">{col.emptyText}</div>
+                  ) : (
+                    colTasks.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        onEdit={openEditModal}
+                        onDelete={(taskId) => deleteMutation.mutate(taskId)}
+                        onStatusChange={(taskId, newStatus) =>
+                          statusMutation.mutate({ taskId, status: newStatus })
+                        }
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       </main>
 
